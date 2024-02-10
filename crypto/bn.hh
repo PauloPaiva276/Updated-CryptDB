@@ -25,26 +25,26 @@ class _bignum_ctx {
 class bignum {
  public:
     bignum() {
-        BN_init(&b);
+        BN_new(&b);
     }
 
     bignum(unsigned long v) {
-        BN_init(&b);
+        BN_new(&b);
         BN_set_word(&b, v);
     }
 
     bignum(const bignum &other) {
-        BN_init(&b);
+        BN_new(&b);
         throw_c(BN_copy(&b, other.bn()));
     }
 
     bignum(const uint8_t *buf, size_t nbytes) {
-        BN_init(&b);
+        BN_new(&b);
         throw_c(BN_bin2bn(buf, nbytes, &b));
     }
 
     bignum(const std::string &v) {
-        BN_init(&b);
+        BN_new(&b);
         throw_c(BN_bin2bn((uint8_t*) v.data(), v.size(), &b));
     }
 
