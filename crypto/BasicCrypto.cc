@@ -12,9 +12,6 @@
 #include <util/cryptdb_log.hh>
 
 
-#include <openssl/evp.h>
-
-
 using namespace std;
 
 
@@ -34,41 +31,21 @@ rounded_len(unsigned long len, uint block_size, bool dopad,
     }
 }
 
-string getKey(const AES_KEY * const masterKeyArg, const string &uniqueFieldName, SECLEVEL sec) {
+
+string
+getKey(const AES_KEY * const masterKeyArg, const string &uniqueFieldName,
+                      SECLEVEL sec)
+{
     string id = uniqueFieldName + strFromVal((unsigned int) sec);
 
     unsigned char shaDigest[SHA_DIGEST_LENGTH];
     SHA1((const uint8_t *) &id[0], id.length(), shaDigest);
 
     string result;
-    result.resize(AES_BLOCK_BYTES); // Ensure the result has the correct size
-
-    // Use the EVP interface
-    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    if (!ctx) {
-        // Handle error
-    }
-
-    if (1 != EVP_EncryptInit_ex(ctx, EVP_aes_256_ecb(), NULL, (const unsigned char*)masterKeyArg, NULL)) {
-        // Handle error
-        EVP_CIPHER_CTX_free(ctx);
-        return "";
-    }
-
-    int len;
-    unsigned char cipherText[AES_BLOCK_SIZE]; // Assuming AES_BLOCK_BYTES == AES_BLOCK_SIZE
-    if (1 != EVP_EncryptUpdate(ctx, cipherText, &len, shaDigest, SHA_DIGEST_LENGTH)) {
-        // Handle error
-        EVP_CIPHER_CTX_free(ctx);
-        return "";
-    }
-
-    result.assign((char*)cipherText, len);
-
-    EVP_CIPHER_CTX_free(ctx);
+    result.resize(AES_BLOCK_BYTES);
+    AES_encrypt(shaDigest, (uint8_t *) &result[0], masterKeyArg);
     return result;
 }
-
 
 string
 marshallKey(const string &key)
@@ -85,6 +62,7 @@ marshallKey(const string &key)
     return res;
 }
 
+// FIXME: Memleak.
 AES_KEY *
 getKey(const string & key) {
     AES_KEY * resKey = new AES_KEY();
@@ -361,71 +339,53 @@ DER_encode_RSA_public(RSA *rsa)
 static RSA *
 DER_decode_RSA_public(const string &s)
 {
-    const uint8_t *buf = reinterpret_cast<const uint8_t*>(s.data());
-    return d2i_RSAPublicKey(nullptr, &buf, s.length());
+    const uint8_t *buf = (const uint8_t*) s.data();
+    return d2i_RSAPublicKey(0, &buf, s.length());
 }
 
-
-// Marshall key
+//marshall key
 static string
 DER_encode_RSA_private(RSA *rsa)
 {
     string s;
-    int len = i2d_RSAPrivateKey(rsa, nullptr);
-    if (len < 0) {
-        // Handle error
-        throw CryptoError("Failed to DER encode RSA private key");
-    }
-    s.resize(len);
-    uint8_t *next = reinterpret_cast<uint8_t*>(&s[0]);
+    s.resize(i2d_RSAPrivateKey(rsa, 0));
+
+    uint8_t *next = (uint8_t *) &s[0];
     i2d_RSAPrivateKey(rsa, &next);
     return s;
 }
 
-
-// Unmarshall private key
 static RSA *
 DER_decode_RSA_private(const string &s)
 {
-    const uint8_t *buf = reinterpret_cast<const uint8_t*>(s.data());
-    RSA *rsa = d2i_RSAPrivateKey(nullptr, &buf, static_cast<long>(s.length()));
-    if (!rsa) {
-        // Handle error
-        throw CryptoError("Failed to DER decode RSA private key");
-    }
-    return rsa;
+    const uint8_t *buf = (const uint8_t*) s.data();
+    return d2i_RSAPrivateKey(0, &buf, s.length());
 }
 
-
-// Remove private components from RSA struct
 static void
 remove_private_key(RSA *r)
 {
-    if (r) {
-        // Clear private components
-        r->d = r->p = r->q = r->dmp1 = r->dmq1 = r->iqmp = nullptr;
-    }
+    r->d = r->p = r->q = r->dmp1 = r->dmq1 = r->iqmp = 0;
 }
-
 
 //Credits: the above five functions are from "secure programming cookbook for
 // C++"
 
 void
-generateKeys(RSA * & pk, RSA * & sk)
+generateKeys(PKCS * & pk, PKCS * & sk)
 {
     LOG(crypto) << "pkcs generate";
-    RSA * key = RSA_generate_key_ex(PKCS_bytes_size * 8, 3, NULL, NULL);
+    PKCS * key =  RSA_generate_key(PKCS_bytes_size*8, 3, NULL, NULL);
 
     sk = RSAPrivateKey_dup(key);
 
     pk = key;
     remove_private_key(pk);
+
 }
 
-
 string
-marshallKey(RSA * mkey, bool ispk)
+marshallKey(PKCS * mkey, bool ispk)
 {
     LOG(crypto) << "pkcs encrypt";
     string key;
@@ -438,7 +398,7 @@ marshallKey(RSA * mkey, bool ispk)
     return key;
 }
 
-RSA *
+PKCS *
 unmarshallKey(const string &key, bool ispk)
 {
     LOG(crypto) << "pkcs decrypt";
@@ -450,104 +410,39 @@ unmarshallKey(const string &key, bool ispk)
     }
 }
 
-
 string
-encrypt(RSA * key, const string &s)
+encrypt(PKCS * key, const string &s)
 {
     string tocipher;
     tocipher.resize(RSA_size(key));
 
-    EVP_PKEY *pkey = EVP_PKEY_new();
-    EVP_PKEY_set1_RSA(pkey, key);
-
-    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(pkey, NULL);
-    if (!ctx) {
-        // Handle error
-        EVP_PKEY_free(pkey);
-        throw CryptoError("Failed to initialize EVP_PKEY_CTX for encryption");
-    }
-
-    if (EVP_PKEY_encrypt_init(ctx) <= 0) {
-        // Handle error
-        EVP_PKEY_CTX_free(ctx);
-        EVP_PKEY_free(pkey);
-        throw CryptoError("Failed to initialize encryption context");
-    }
-
-    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0) {
-        // Handle error
-        EVP_PKEY_CTX_free(ctx);
-        EVP_PKEY_free(pkey);
-        throw CryptoError("Failed to set RSA padding");
-    }
-
-    size_t outlen = tocipher.size();
-    if (EVP_PKEY_encrypt(ctx, (uint8_t*)&tocipher[0], &outlen, (const uint8_t*)s.data(), s.length()) <= 0) {
-        // Handle error
-        EVP_PKEY_CTX_free(ctx);
-        EVP_PKEY_free(pkey);
-        throw CryptoError("Encryption failed");
-    }
-
-    EVP_PKEY_CTX_free(ctx);
-    EVP_PKEY_free(pkey);
-
-    tocipher.resize(outlen);
+    RSA_public_encrypt((int) s.length(),
+                       (const uint8_t*) s.data(), (uint8_t*) &tocipher[0],
+                       key,
+                       RSA_PKCS1_OAEP_PADDING);
 
     return tocipher;
 }
 
-
 string
-decrypt(RSA * key, const string &s)
+decrypt(PKCS * key, const string &s)
 {
     throw_c(s.length() == (uint)RSA_size(key));
-
     string toplain;
+    toplain.resize(RSA_size(key));
 
-    EVP_PKEY *pkey = EVP_PKEY_new();
-    EVP_PKEY_set1_RSA(pkey, key);
-
-    EVP_PKEY_CTX *ctx = EVP_PKEY_CTX_new(pkey, NULL);
-    if (!ctx) {
-        // Handle error
-        EVP_PKEY_free(pkey);
-        throw CryptoError("Failed to initialize EVP_PKEY_CTX for decryption");
-    }
-
-    if (EVP_PKEY_decrypt_init(ctx) <= 0) {
-        // Handle error
-        EVP_PKEY_CTX_free(ctx);
-        EVP_PKEY_free(pkey);
-        throw CryptoError("Failed to initialize decryption context");
-    }
-
-    if (EVP_PKEY_CTX_set_rsa_padding(ctx, RSA_PKCS1_OAEP_PADDING) <= 0) {
-        // Handle error
-        EVP_PKEY_CTX_free(ctx);
-        EVP_PKEY_free(pkey);
-        throw CryptoError("Failed to set RSA padding");
-    }
-
-    size_t outlen = toplain.size();
-    if (EVP_PKEY_decrypt(ctx, (uint8_t*)&toplain[0], &outlen, (const uint8_t*)s.data(), s.length()) <= 0) {
-        // Handle error
-        EVP_PKEY_CTX_free(ctx);
-        EVP_PKEY_free(pkey);
-        throw CryptoError("Decryption failed");
-    }
-
-    EVP_PKEY_CTX_free(ctx);
-    EVP_PKEY_free(pkey);
-
-    toplain.resize(outlen);
+    uint len =
+        RSA_private_decrypt((int) s.length(),
+                            (const uint8_t*) s.data(),
+                            (uint8_t*) &toplain[0], key,
+                            RSA_PKCS1_OAEP_PADDING);
+    toplain.resize(len);
 
     return toplain;
 }
 
-
 void
-freeKey(RSA * key)
+freeKey(PKCS * key)
 {
     RSA_free(key);
 }
@@ -564,4 +459,5 @@ getLayerKey(const AES_KEY * const mKey, string uniqueFieldName,
     }
     return getKey(mKey, uniqueFieldName, l);
 }
+
 

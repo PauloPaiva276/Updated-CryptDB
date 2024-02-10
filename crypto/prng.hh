@@ -40,10 +40,10 @@ class PRNG {
     NTL::ZZ rand_zz_nbits(size_t nbits);
     NTL::ZZ rand_zz_prime(size_t nbits);
 
-    BN_new() rand_bn_mod(const BN_new() &max) {
+    bignum rand_bn_mod(const bignum &max) {
         uint8_t buf[BN_num_bytes(max.bn())];
         rand_bytes(sizeof(buf), buf);
-        return BN_new()(buf, sizeof(buf)) % max;
+        return bignum(buf, sizeof(buf)) % max;
     }
 
     virtual ~PRNG() {}
