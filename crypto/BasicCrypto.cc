@@ -375,7 +375,7 @@ void
 generateKeys(PKCS * & pk, PKCS * & sk)
 {
     LOG(crypto) << "pkcs generate";
-    PKCS * key =  RSA_generate_key_ex(PKCS_bytes_size*8, 3, NULL, NULL);
+    PKCS * key =  RSA_generate_key_ex_ex(PKCS_bytes_size*8, 3, NULL, NULL);
 
     sk = RSAPrivateKey_dup(key);
 

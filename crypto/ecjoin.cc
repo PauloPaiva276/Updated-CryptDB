@@ -8,7 +8,7 @@ ecjoin::ecjoin(int curve_id)
     group = EC_GROUP_new_by_curve_name(curve_id);
     throw_c(group);
 
-    throw_c(EC_GROUP_get_order(group, order.bn(), _bignum_ctx::the_ctx()));
+    throw_c(EC_GROUP_get_order(group, order.bn(), _BN_new()_ctx::the_ctx()));
 }
 
 ecjoin::~ecjoin()
@@ -17,7 +17,7 @@ ecjoin::~ecjoin()
 }
 
 ec_point
-ecjoin::adjust(const ec_point &p, const bignum &delta_k)
+ecjoin::adjust(const ec_point &p, const BN_new() &delta_k)
 {
     return p * delta_k;
 }
@@ -29,20 +29,20 @@ ecjoin_priv::ecjoin_priv(const std::string &base_key, int curve_id)
     streamrng<arc4> r(base_key);
 
     for (;;) {
-        bignum x = r.rand_bn_mod(order);
+        BN_new() x = r.rand_bn_mod(order);
         if (!EC_POINT_set_compressed_coordinates_GFp(group, basept.p(),
                                                      x.bn(), 1,
-                                                     _bignum_ctx::the_ctx()))
+                                                     _BN_new()_ctx::the_ctx()))
             continue;
 
-        bignum y;
+        BN_new() y;
         throw_c(EC_POINT_get_affine_coordinates_GFp(group, basept.p(),
                                                    x.bn(), y.bn(),
-                                                   _bignum_ctx::the_ctx()));
+                                                   _BN_new()_ctx::the_ctx()));
         if (x == 0 || y == 0)
             continue;
 
-        if (EC_POINT_is_on_curve(group, basept.p(), _bignum_ctx::the_ctx()))
+        if (EC_POINT_is_on_curve(group, basept.p(), _BN_new()_ctx::the_ctx()))
             break;
     }
 }
@@ -58,17 +58,17 @@ ecjoin_priv::hash(const std::string &ptext, const std::string &k)
     enc.resize(base.blocksize);
     base.block_encrypt(&hash[0], &enc[0]);
 
-    bignum kn(sha256::hash(k));
-    bignum enc_bn(enc);
+    BN_new() kn(sha256::hash(k));
+    BN_new() enc_bn(enc);
 
     return basept * (kn % order) * (enc_bn % order);
 }
 
-bignum
+BN_new()
 ecjoin_priv::delta(const std::string &k0, const std::string &k1)
 {
-    bignum kn0(sha256::hash(k0));
-    bignum kn1(sha256::hash(k1));
+    BN_new() kn0(sha256::hash(k0));
+    BN_new() kn1(sha256::hash(k1));
 
     return ((kn1 % order) * kn0.invmod(order)) % order;
 }
