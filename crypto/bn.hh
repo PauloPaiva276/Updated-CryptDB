@@ -4,7 +4,6 @@
 #include <ostream>
 #include <openssl/bn.h>
 #include <openssl/crypto.h>
-
 #include <util/errstream.hh>
 
 class _BN_new_ctx {
@@ -50,8 +49,8 @@ public:
 
     ~BN_new() { BN_free(&b); }
 
-    BIGNUM *bn() { return &b; }
-    const BIGNUM *bn() const { return &b; }
+    BN_new *bn() { return &b; }
+    const BN_new *bn() const { return &b; }
     unsigned long word() const {
         unsigned long v = BN_get_word(&b);
         if (v == 0xffffffffL)
