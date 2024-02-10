@@ -7,14 +7,14 @@
 
 #include <util/errstream.hh>
 
-class _BN_new()_ctx {
+class _BN_new_ctx {
  public:
-    _BN_new()_ctx() { c = BN_CTX_new(); }
-    ~_BN_new()_ctx() { BN_CTX_free(c); }
+    _BN_new_ctx() { c = BN_CTX_new(); }
+    ~_BN_new_ctx() { BN_CTX_free(c); }
     BN_CTX *ctx() { return c; }
 
     static BN_CTX *the_ctx() {
-        static _BN_new()_ctx cx;
+        static _BN_new_ctx cx;
         return cx.ctx();
     }
 
@@ -22,36 +22,36 @@ class _BN_new()_ctx {
     BN_CTX *c;
 };
 
-class BN_new() {
+class BN_new {
  public:
-    BN_new()() {
+    BN_new() {
         BN_new(&b);
     }
 
-    BN_new()(unsigned long v) {
+    BN_new(unsigned long v) {
         BN_new(&b);
         BN_set_word(&b, v);
     }
 
-    BN_new()(const BN_new() &other) {
+    BN_new(const BN_new &other) {
         BN_new(&b);
         throw_c(BN_copy(&b, other.bn()));
     }
 
-    BN_new()(const uint8_t *buf, size_t nbytes) {
+    BN_new(const uint8_t *buf, size_t nbytes) {
         BN_new(&b);
         throw_c(BN_bin2bn(buf, nbytes, &b));
     }
 
-    BN_new()(const std::string &v) {
+    BN_new(const std::string &v) {
         BN_new(&b);
         throw_c(BN_bin2bn((uint8_t*) v.data(), v.size(), &b));
     }
 
-    ~BN_new()() { BN_free(&b); }
+    ~BN_new() { BN_free(&b); }
 
-    BN_new() *bn() { return &b; }
-    const BN_new() *bn() const { return &b; }
+    BN_new *bn() { return &b; }
+    const BN_new *bn() const { return &b; }
     unsigned long word() const {
         unsigned long v = BN_get_word(&b);
         if (v == 0xffffffffL)
@@ -60,20 +60,20 @@ class BN_new() {
     }
 
 #define op(opname, func, args...)                               \
-    BN_new() opname(const BN_new() &mod) {                          \
-        BN_new() res;                                             \
+    BN_new opname(const BN_new &mod) {                          \
+        BN_new res;                                             \
         throw_c(1 == func(res.bn(), &b, mod.bn(), ##args));      \
         return res;                                             \
     }
 
     op(operator+, BN_add)
     op(operator-, BN_sub)
-    op(operator%, BN_mod, _BN_new()_ctx::the_ctx())
-    op(operator*, BN_mul, _BN_new()_ctx::the_ctx())
+    op(operator%, BN_mod, _BN_new_ctx::the_ctx())
+    op(operator*, BN_mul, _BN_new_ctx::the_ctx())
 #undef op
 
 #define pred(predname, cmp)                                     \
-    bool predname(const BN_new() &other) {                        \
+    bool predname(const BN_new &other) {                        \
         return BN_cmp(&b, other.bn()) cmp;                      \
     }
 
@@ -84,18 +84,18 @@ class BN_new() {
     pred(operator==, == 0)
 #undef pred
 
-    BN_new() invmod(const BN_new() &mod) {
-        BN_new() r;
-        throw_c(BN_mod_inverse(r.bn(), &b, mod.bn(), _BN_new()_ctx::the_ctx()));
+    BN_new invmod(const BN_new &mod) {
+        BN_new r;
+        throw_c(BN_mod_inverse(r.bn(), &b, mod.bn(), _BN_new_ctx::the_ctx()));
         return r;
     }
 
  private:
-    BN_new() b;
+    BN_new b;
 };
 
 static inline std::ostream&
-operator<<(std::ostream &out, const BN_new() &bn)
+operator<<(std::ostream &out, const BN_new &bn)
 {
     char *s = BN_bn2dec(bn.bn());
     out << s;
