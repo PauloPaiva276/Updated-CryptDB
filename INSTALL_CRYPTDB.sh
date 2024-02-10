@@ -9,7 +9,7 @@ echo =============COMPILE MYSQL================================
 
 rm -rf mysql-src
 tar -xvf packages/mysql-src.tar.gz
-export CXX=g++-4.7
+export CXX=g++
 cd mysql-src;mkdir build;cd build;cmake -DWITH_EMBEDDED_SERVER=on -DENABLE_DTRACE=off .. ; make;cd ../..;
 
 echo ===============OK========================================

@@ -2,7 +2,7 @@ MYSRC := $(shell pwd)/mysql-src
 MYBUILD := $(MYSRC)/build
 RPATH := 1
 
-CXX := g++-4.7
+CXX := g++
 MYSQL_PLUGIN_DIR := /usr/lib/mysql/plugin
 
 
